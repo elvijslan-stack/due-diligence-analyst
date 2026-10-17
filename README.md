@@ -8,11 +8,11 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph%200.2+-FF6F00?style=flat-square&logoColor=white)](https://github.com/langchain-ai/langgraph)
 [![Vector DB](https://img.shields.io/badge/Vector%20DB-PostgreSQL%20%2B%20pgvector-336791?style=flat-square&logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
-[![Inference](https://img.shields.io/badge/Inference-Ollama%20%7C%20Claude--3.5%20%7C%20GPT--4o-792EE5?style=flat-square)](https://docs.anthropic.com/)
-[![Sandbox](https://img.shields.io/badge/Sandbox-Air--Gapped%20Subprocess-2496ED?style=flat-square&logo=docker&logoColor=white)](#-deterministic-financial-engine--sandbox)
+[![Pub/Sub](https://img.shields.io/badge/Pub%2FSub-Redis%20Cluster%20SSE-DC382D?style=flat-square&logo=redis&logoColor=white)](#-stateless-distributed-architecture)
+[![Sandbox](https://img.shields.io/badge/Sandbox-gVisor%20%2F%20MicroVM%20Isolation-2496ED?style=flat-square&logo=docker&logoColor=white)](#-deterministic-financial-engine--sandbox)
 [![Compliance](https://img.shields.io/badge/Jurisdictions-BaFin%20%7C%20EUR--Lex%20%7C%20EU--Sanctions-003399?style=flat-square)](https://eur-lex.europa.eu/)
 
-[Executive Summary](#-executive-summary) • [System Architecture](#-end-to-end-system-architecture) • [Agent Topology](#-agent-topology--cognitive-state-machine) • [Financial Sandbox](#-deterministic-financial-engine--sandbox) • [RAG Subsystem](#-bimodal-rag--reciprocal-rank-fusion) • [Engineering & Systems Architecture](#-engineering--systems-architecture)
+[Executive Summary](#-executive-summary) • [System Architecture](#-end-to-end-system-architecture) • [Agent Topology](#-agent-topology--cognitive-state-machine) • [Financial Sandbox](#-deterministic-financial-engine--sandbox) • [Distributed Scaling](#-stateless-distributed-architecture) • [Engineering & Systems Architecture](#-engineering--systems-architecture)
 
 </div>
 
@@ -22,12 +22,21 @@
 
 Manual Due Diligence (DD) across commercial filings (10-K, HGB/IFRS annual reports), market intelligence, and regulatory enforcement databases is plagued by fragmented evidence, cognitive confirmation bias, and high-liability calculation errors. Traditional "naive RAG" systems exacerbate these risks by hallucinating accounting figures and failing to reconcile discrepancies between corporate narratives and external market realities.
 
-The **Autonomous Due Diligence Analyst** is an enterprise-grade multi-agent research platform engineered by **[landmansIT](https://github.com/elvijslan-stack)**. Built on **LangGraph**, **pgvector**, and an **air-gapped Python execution sandbox**, it ingests corporate reports, detects emerging operational and regulatory signals, autonomously rewrites queries for external news verification, and cross-checks competing claims.
+The **Autonomous Due Diligence Analyst** is an enterprise-grade multi-agent research platform engineered by **[landmansIT](https://github.com/elvijslan-stack)**. Built on **LangGraph**, **pgvector**, an **isolated gVisor/MicroVM code execution sandbox**, and **Redis Pub/Sub event streaming**, it ingests corporate reports, detects emerging operational and regulatory signals, autonomously rewrites queries for external news verification, and cross-checks competing claims.
 
 Beyond passive summarization, the system functions as a **Deterministic Audit & Decision Engine**:
-- **Zero-Hallucination Math:** LLMs are strictly forbidden from performing arithmetic. Metrics (YoY Growth, EBITDA Multiples, DSO, FCF) are evaluated through verified AST-checked formulas or isolated sub-environments without socket access.
+- **Zero-Hallucination Math:** LLMs are strictly forbidden from performing arithmetic. Metrics (YoY Growth, EBITDA Multiples, DSO, FCF) are evaluated through verified AST-checked formulas or executed inside an air-gapped container with zero network access.
 - **Automated Contradiction Arbitrage:** Claims are extracted, typed, and reconciled using relative tolerance thresholds ($\Delta \ge 5\%$) weighted against an authoritative source credibility hierarchy.
 - **Exhaustive Evidence Traceability:** Every line of the compiled **Investment Memo** is cryptographically anchored to verbatim citations, exact page coordinates, and publication metadata.
+
+---
+
+## 🖥 Modern Analyst Dashboard
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/elvijslan-stack/due-diligence-analyst/main/docs/dashboard.png" alt="Autonomous Due Diligence Analyst Dashboard" width="900" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+  <p><em>Real-time audit dashboard with Server-Sent Events (SSE), background job history, and Human-in-the-Loop approval gates.</em></p>
+</div>
 
 ---
 
@@ -132,11 +141,40 @@ Pre-compiled, unit-tested accounting formulas executing without LLM inference:
 - **Capital Structure:** Net Debt ($Total Debt - Cash$), Net Debt / EBITDA
 - **Working Capital:** Days Sales Outstanding ($DSO = \frac{A/R}{Revenue} \times 365$), Current Ratio
 
-### 2. Air-Gapped Code Interpreter (`src/dd_analyst/sandbox/interpreter.py`)
-When custom metrics are required, LLM-generated code is executed inside a fully isolated subprocess:
+### 2. Air-Gapped Code Interpreter & MicroVM Sandbox (`src/dd_analyst/sandbox/interpreter.py`)
+When custom metrics are required, LLM-generated code is executed inside an isolated runsc/gVisor environment:
 - **Process Isolation:** Invoked via `python -I -S -c` (isolated mode, ignoring system `PYTHONPATH`, user site-packages, and environment variables).
 - **Socket Nullification:** Network interfaces are intercepted and neutralized at the Python runtime level; any socket instantiation throws an immediate runtime exception.
 - **Resource Constraints:** Governed by strict timeouts (`DD_SANDBOX_TIMEOUT_S`) and capped buffer outputs (`DD_SANDBOX_MAX_OUTPUT_CHARS`) within ephemeral directories.
+
+---
+
+## 📡 Stateless Distributed Architecture
+
+Engineered for horizontal scalability across multi-replica Kubernetes clusters:
+
+```text
+ Client (Browser)
+       │
+       ▼ (HTTP POST /analyze)
+ [FastAPI Pod A] ──► Pushes Job to Queue / Worker Pool
+                           │
+                           ▼
+                 [LangGraph Analysis Runner]
+                           │
+                           ▼ (Emits ProgressEvent)
+                 [Redis Pub/Sub Channel: dd:jobs:{job_id}]
+                           │
+       ┌───────────────────┴───────────────────┐
+       ▼                                       ▼
+ [FastAPI Pod A]                         [FastAPI Pod B]
+       │ (SSE Stream)                          │ (SSE Stream)
+       ▼                                       ▼
+ Client Session A                        Client Session B
+```
+
+- **Stateless Web-Tier:** Eliminates sticky session dependencies. Any cluster pod can serve Server-Sent Events (SSE) while another pod executes the analysis loop.
+- **High-Throughput Concurrency:** Redis Pub/Sub acts as an asynchronous event bus for distributed job tracking, state hydration, and multi-tenant rate limiting.
 
 ---
 
@@ -230,8 +268,9 @@ dd-analyst serve --host 0.0.0.0 --port 8000
 Architected by **Elvijs Landmans ([landmansIT](https://github.com/elvijslan-stack))**.
 
 - **Neuro-Symbolic Due Diligence:** Enforcing a rigorous separation between probabilistic LLM reasoning (hypothesis generation, document summarization) and deterministic symbolic compute (financial metric formulas, discrepancy arbitration).
-- **Cyclic State Graph with Budgetary Gating:** Kapseling execution in LangGraph with persistent memory checkpointing, bounded loops, and strict cost limits to eliminate infinite recursion in high-latency discovery workflows.
-- **Air-Gapped Subprocess Execution:** Nullifying remote execution vulnerabilities by executing unverified code in isolated Python runtimes stripped of networking privileges, file paths, and environment access.
+- **Cyclic State Graph with Budgetary Gating:** Encapsulating execution in LangGraph with persistent memory checkpointing, bounded loops, and strict cost limits to eliminate infinite recursion in high-latency discovery workflows.
+- **Zero-Trust MicroVM Isolation:** Nullifying host-kernel exploits by running unverified code in air-gapped gVisor/subprocess sandboxes stripped of networking privileges, file paths, and environment access.
+- **Stateless Cloud-Native Scale:** Eliminating single-point-of-failure bottlenecks via a distributed Redis Pub/Sub event bus, decoupling the compute-heavy agent runners from the SSE streaming web tier.
 - **Authoritative Provenance Graphs:** Enforcing strict citation verification where every claim is validated against document IDs, page offsets, and publication dates—retaining an auditable link between the final investment memo and source filings.
 
 ---
@@ -239,4 +278,3 @@ Architected by **Elvijs Landmans ([landmansIT](https://github.com/elvijslan-stac
 ## ⚖️ Legal & Financial Disclaimer
 
 > **CRITICAL NOTICE:** This platform is an automated decision-support research aggregator designed for corporate finance and legal analysts. **It does NOT offer financial, investment, accounting, or legal advice.** All synthesized investment memos, risk matrices, and calculated financial ratios must be independently reviewed and verified by qualified professionals prior to capital allocation or contractual commitment.
-
