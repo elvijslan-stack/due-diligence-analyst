@@ -98,7 +98,7 @@ flowchart TD
     end
 
     LegalRiskLinker --> RiskScorer
-`
+```
 
 ---
 
