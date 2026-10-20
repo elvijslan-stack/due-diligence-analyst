@@ -63,7 +63,7 @@ The system enforces a **Bifurcated Data Flow**:
 ## 🖥 Modern Analyst Dashboard
 
 <div align="center">
-  <img src="dashboard1.png" alt="Autonomous Due Diligence Analyst Dashboard" width="900" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+  <img src="docs/dashboard1.png" alt="Autonomous Due Diligence Analyst Dashboard" width="900" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
   <p><em>Production UI with Multi-File Drag & Drop (up to 20 files / 50MB), automated SEC EDGAR/Web ingestion, and real-time Server-Sent Events (SSE) telemetry.</em></p>
 </div>
 
